@@ -1,0 +1,11 @@
+pynput
+PyQt5
+pyautogui
+keyboard
+screeninfo
+Pillow
+psutil
+numpy
+opencv-python
+pycryptodome
+requests
