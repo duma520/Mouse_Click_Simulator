@@ -1,5 +1,3 @@
-__version__ = "2.4"
-
 import sys
 import os
 import time
@@ -14,7 +12,8 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                             QLabel, QComboBox, QSpinBox, QPushButton, QGroupBox,
                             QLineEdit, QCheckBox, QTabWidget, QTextEdit, QFileDialog,
                             QSystemTrayIcon, QMenu, QAction, QMessageBox, QScrollArea,
-                            QDoubleSpinBox, QTimeEdit, QColorDialog, QProgressBar, QInputDialog)
+                            QDoubleSpinBox, QTimeEdit, QColorDialog, QProgressBar, QInputDialog,
+                            QStyle)
 from PyQt5.QtCore import Qt, QSettings, QTimer, QTime, QSize, QByteArray, QPoint
 from PyQt5.QtGui import QIcon, QColor, QPixmap, QImage,QPainter, QPen
 import pyautogui
@@ -45,10 +44,50 @@ logging.basicConfig(
     ]
 )
 
+class ProjectInfo:
+    """项目信息元数据（集中管理所有项目相关信息）"""
+    VERSION = "2.10.0"
+    BUILD_DATE = "2025-06-01"
+    # BUILD_DATE = datetime.now().strftime("%Y-%m-%d")  # 修改为动态获取当前日期
+    AUTHOR = "杜玛"
+    LICENSE = "MIT"
+    COPYRIGHT = "© 永久 杜玛"
+    URL = "https://github.com/duma520"
+    MAINTAINER_EMAIL = "不提供"
+    NAME = "高级鼠标点击模拟器"
+    DESCRIPTION = "高级鼠标点击模拟器，支持多种触发方式和脚本功能，适用于游戏辅助、自动化测试等场景。"
+    VERSION_HISTORY = {
+        "2.8.0": "fix: 修复了多坐标循环模式下的点击位置问题，优化了脚本执行速度。",
+        "2.9.0": "fix: 修复了QStyle相关的显示问题",
+        "2.10.0": "fix: 修复了托盘图标加载失败的情况，优化了系统图标获取方式。"
+    }
+    HELP_TEXT = """
+使用说明:
+
+"""
+
+
+    @classmethod
+    def get_metadata(cls) -> dict:
+        """获取主要元数据字典"""
+        return {
+            'version': cls.VERSION,
+            'author': cls.AUTHOR,
+            'license': cls.LICENSE,
+            'url': cls.URL
+        }
+
+
+    @classmethod
+    def get_header(cls) -> str:
+        """生成标准化的项目头信息"""
+        return f"{cls.NAME} {cls.VERSION} | {cls.LICENSE} License | {cls.URL}"
+
 class MouseClickSimulator(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("高级鼠标点击模拟器")
+        # self.setWindowTitle(f"高级鼠标点击模拟器 v{__version__}")
+        self.setWindowTitle(f"{ProjectInfo.NAME} {ProjectInfo.VERSION} (Build: {ProjectInfo.BUILD_DATE})")
 
         # 设置窗口图标
         if os.path.exists("icon.ico"):
@@ -61,7 +100,7 @@ class MouseClickSimulator(QMainWindow):
         # 根据屏幕分辨率自动调整大小
         screen = QApplication.primaryScreen()
         screen_size = screen.size()
-        self.resize(int(screen_size.width()*0.4), int(screen_size.height()*0.7))
+        self.resize(int(screen_size.width()*0.4), int(screen_size.height()*0.8))
 
         
         # 初始化设置
@@ -88,7 +127,10 @@ class MouseClickSimulator(QMainWindow):
         # 初始化UI
         self.init_ui()
         self.setup_hotkeys()
-        self.setup_tray_icon()
+
+        # 只在系统托盘可用时初始化
+        if QSystemTrayIcon.isSystemTrayAvailable():
+            self.setup_tray_icon()
         
         # 启动监控定时器
         self.monitor_timer = QTimer(self)
@@ -114,7 +156,9 @@ class MouseClickSimulator(QMainWindow):
         self.memory_history = []
         self.max_history_points = 60  # 保留60个数据点
     
+
     def init_ui(self):
+
         # 创建主滚动区域
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -211,7 +255,137 @@ class MouseClickSimulator(QMainWindow):
         self.stop_button.clicked.connect(self.stop_clicking)
         self.emergency_button.clicked.connect(self.emergency_stop_func)
 
+        # 设置全局样式
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #f5f7fa;
+            }
+            QGroupBox {
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+                margin-top: 10px;
+                padding-top: 15px;
+                font-weight: bold;
+                color: #374151;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 3px;
+            }
+            QPushButton {
+                background-color: #3b82f6;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px 12px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #2563eb;
+            }
+            QPushButton:pressed {
+                background-color: #1d4ed8;
+            }
+            QPushButton:disabled {
+                background-color: #9ca3af;
+            }
+            QLabel {
+                color: #374151;
+            }
+            QLineEdit, QTextEdit, QComboBox, QSpinBox {
+                border: 1px solid #d1d5db;
+                border-radius: 4px;
+                padding: 4px;
+            }
+            QTabWidget::pane {
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+            }
+            QTabBar::tab {
+                padding: 8px 16px;
+                background: #e5e7eb;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+                margin-right: 2px;
+            }
+            QTabBar::tab:selected {
+                background: #f5f7fa;
+                border-bottom: 2px solid #3b82f6;
+            }
+        """)
+        
+        # 控制按钮特殊样式
+        self.start_button.setStyleSheet("""
+            QPushButton {
+                background-color: #10b981;
+            }
+            QPushButton:hover {
+                background-color: #059669;
+            }
+        """)
+        
+        self.stop_button.setStyleSheet("""
+            QPushButton {
+                background-color: #ef4444;
+            }
+            QPushButton:hover {
+                background-color: #dc2626;
+            }
+        """)
+        
+        # 状态栏样式
+        self.status_bar.setStyleSheet("""
+            QLabel {
+                background-color: #ffffff;
+                border: 1px solid #d1d5db;
+                border-radius: 4px;
+                padding: 8px;
+                font-size: 12px;
+            }
+        """)
+        
+        # 图表区域样式
+        self.cpu_chart.setStyleSheet("""
+            QLabel {
+                background-color: white;
+                border: 1px solid #d1d5db;
+                border-radius: 4px;
+            }
+        """)
+        
+        self.memory_chart.setStyleSheet("""
+            QLabel {
+                background-color: white;
+                border: 1px solid #d1d5db;
+                border-radius: 4px;
+            }
+        """)
+        
+        # 日志区域样式
+        self.log_view.setStyleSheet("""
+            QTextEdit {
+                background-color: white;
+                border: 1px solid #d1d5db;
+                border-radius: 4px;
+                font-family: 'Consolas', monospace;
+                font-size: 10pt;
+                color: #374151;
+            }
+        """)
+
+
+
+    def resizeEvent(self, event):
+        # 根据窗口宽度调整布局
+        width = event.size().width()
+        if width < 800:  # 小屏幕布局
+            self.tabs.setStyleSheet("QTabBar::tab { padding: 6px 12px; }")
+        else:  # 大屏幕布局
+            self.tabs.setStyleSheet("QTabBar::tab { padding: 8px 16px; }")
+        super().resizeEvent(event)
     
+
     def create_scrollable_tab(self, content_init_func):
         """创建带有滚动条的可滚动标签页"""
         scroll = QScrollArea()
@@ -988,17 +1162,21 @@ class MouseClickSimulator(QMainWindow):
         self.cpu_chart = QLabel("CPU使用率图表")
         self.cpu_chart.setFixedHeight(150)
         self.cpu_chart.setStyleSheet("""
-            background-color: white; 
-            border: 1px solid #C0C0C0;
-            border-radius: 3px;
+            QLabel {
+                background-color: white;
+                border: 1px solid #d1d5db;
+                border-radius: 4px;
+            }
         """)
         
         self.memory_chart = QLabel("内存使用率图表")
         self.memory_chart.setFixedHeight(150)
         self.memory_chart.setStyleSheet("""
-            background-color: white; 
-            border: 1px solid #C0C0C0;
-            border-radius: 3px;
+            QLabel {
+                background-color: white;
+                border: 1px solid #d1d5db;
+                border-radius: 4px;
+            }
         """)
         
         monitor_layout.addWidget(QLabel("CPU使用历史:"))
@@ -1438,40 +1616,53 @@ class MouseClickSimulator(QMainWindow):
         if not QSystemTrayIcon.isSystemTrayAvailable():
             return
         
-        self.tray_icon = QSystemTrayIcon(self)
+        try:
+            self.tray_icon = QSystemTrayIcon(self)
+            
+            # 尝试加载自定义图标
+            icon_set = False
+            for icon_file in ["icon.ico", "icon.png"]:
+                if os.path.exists(icon_file):
+                    try:
+                        self.tray_icon.setIcon(QIcon(icon_file))
+                        icon_set = True
+                        break
+                    except:
+                        continue
+            
+            # 如果自定义图标加载失败，使用系统默认图标
+            if not icon_set:
+                try:
+                    # 使用更兼容的方式获取系统图标
+                    default_icon = self.style().standardIcon(QStyle.SP_ComputerIcon)
+                    self.tray_icon.setIcon(default_icon)
+                except:
+                    # 如果所有方法都失败，则不设置图标
+                    pass
+            
+            # 创建托盘菜单
+            tray_menu = QMenu()
+            actions = [
+                ("显示", self.show),
+                ("开始模拟", self.start_clicking),
+                ("停止模拟", self.stop_clicking),
+                ("退出", self.close)
+            ]
+            
+            for text, callback in actions:
+                action = QAction(text, self)
+                action.triggered.connect(callback)
+                tray_menu.addAction(action)
+            
+            self.tray_icon.setContextMenu(tray_menu)
+            self.tray_icon.show()
+            self.tray_icon.activated.connect(self.tray_icon_activated)
+            
+        except Exception as e:
+            logging.error(f"创建系统托盘图标失败: {str(e)}")
+            # 即使托盘图标创建失败，也不影响主程序运行
+            self.tray_icon = None
 
-        # 设置托盘图标，优先使用 .ico，其次尝试 .png
-        if os.path.exists("icon.ico"):
-            self.tray_icon.setIcon(QIcon("icon.ico"))
-        elif os.path.exists("icon.png"):
-            self.tray_icon.setIcon(QIcon("icon.png"))
-        else:
-            # 如果没有找到图标文件，使用默认图标
-            self.tray_icon.setIcon(self.style().standardIcon(QStyle.SP_ComputerIcon))
-    
-        
-        tray_menu = QMenu()
-        
-        show_action = QAction("显示", self)
-        show_action.triggered.connect(self.show)
-        tray_menu.addAction(show_action)
-        
-        start_action = QAction("开始模拟", self)
-        start_action.triggered.connect(self.start_clicking)
-        tray_menu.addAction(start_action)
-        
-        stop_action = QAction("停止模拟", self)
-        stop_action.triggered.connect(self.stop_clicking)
-        tray_menu.addAction(stop_action)
-        
-        exit_action = QAction("退出", self)
-        exit_action.triggered.connect(self.close)
-        tray_menu.addAction(exit_action)
-        
-        self.tray_icon.setContextMenu(tray_menu)
-        self.tray_icon.show()
-        
-        self.tray_icon.activated.connect(self.tray_icon_activated)
     
     def tray_icon_activated(self, reason):
         if reason == QSystemTrayIcon.DoubleClick:
@@ -2009,6 +2200,8 @@ class MouseClickSimulator(QMainWindow):
 
 
     def closeEvent(self, event):
+        if hasattr(self, 'tray_icon') and self.tray_icon:
+            self.tray_icon.hide()
         self.stop_clicking()
         self.stop_remote_control()
         self.save_settings()
@@ -2016,9 +2209,7 @@ class MouseClickSimulator(QMainWindow):
         if hasattr(self, 'keyboard_listener'):
             self.keyboard_listener.stop()
         
-        if self.tray_icon:
-            self.tray_icon.hide()
-        
+
         event.accept()
 
 
