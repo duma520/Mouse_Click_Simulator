@@ -1,16 +1,19 @@
 # 高级鼠标点击模拟器 - 全方位使用说明书
 
-![image](https://github.com/user-attachments/assets/18239b73-8e53-4f06-982e-40e2367afbc5)
+![image](https://github.com/user-attachments/assets/cd6718c7-14f1-43cb-9b9f-33d0e10aaaaa)
 
-![image](https://github.com/user-attachments/assets/5fb6e2e2-c2a6-4b2d-ae50-01c5fbbd19b2)
+![image](https://github.com/user-attachments/assets/c111a902-ccc0-42a7-8b37-4be7e7d10b9f)
 
-![image](https://github.com/user-attachments/assets/851e7f5c-4152-4c0a-a419-86c9a18e51ca)
+![image](https://github.com/user-attachments/assets/1122cb61-7bde-47da-86fb-d62c2ed492bb)
 
-![image](https://github.com/user-attachments/assets/16df6f24-dc62-4c21-90b1-5eb00e17bdda)
+![image](https://github.com/user-attachments/assets/c67744ee-4845-471e-b744-3de1d65c1113)
 
-![image](https://github.com/user-attachments/assets/b2e80161-88aa-47ca-9fff-6ef5d90eb5e9)
+![image](https://github.com/user-attachments/assets/9648de2e-e18f-4dab-8fd5-fd6658a6f32f)
 
-![image](https://github.com/user-attachments/assets/c860d259-a2d5-4f69-ba19-3f0419869ca8)
+![image](https://github.com/user-attachments/assets/1baa200f-11ff-4327-863b-2007a77e0f10)
+
+![image](https://github.com/user-attachments/assets/0f7acd29-7942-41bf-8157-30bc7f447045)
+
 
 PS：远程控制不一定行，因为主要是本机，远程暂时先不搞（2025-06-13)
 
