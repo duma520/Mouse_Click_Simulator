@@ -1,0 +1,2 @@
+cls
+python Mouse_Click_Simulator.py

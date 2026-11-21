@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                             QSystemTrayIcon, QMenu, QAction, QMessageBox, QScrollArea,
                             QDoubleSpinBox, QTimeEdit, QColorDialog, QProgressBar, QInputDialog,
                             QStyle)
-from PyQt5.QtCore import Qt, QSettings, QTimer, QTime, QSize, QByteArray, QPoint
+from PyQt5.QtCore import (Qt, QSettings, QTimer, QTime, QSize, QByteArray, QPoint, QMetaObject, Qt, Q_ARG)
 from PyQt5.QtGui import QIcon, QColor, QPixmap, QImage,QPainter, QPen
 import pyautogui
 import keyboard
@@ -46,8 +46,8 @@ logging.basicConfig(
 
 class ProjectInfo:
     """项目信息元数据（集中管理所有项目相关信息）"""
-    VERSION = "2.10.0"
-    BUILD_DATE = "2025-06-01"
+    VERSION = "2.12.0"
+    BUILD_DATE = "2025-06-13"
     # BUILD_DATE = datetime.now().strftime("%Y-%m-%d")  # 修改为动态获取当前日期
     AUTHOR = "杜玛"
     LICENSE = "MIT"
@@ -59,7 +59,8 @@ class ProjectInfo:
     VERSION_HISTORY = {
         "2.8.0": "fix: 修复了多坐标循环模式下的点击位置问题，优化了脚本执行速度。",
         "2.9.0": "fix: 修复了QStyle相关的显示问题",
-        "2.10.0": "fix: 修复了托盘图标加载失败的情况，优化了系统图标获取方式。"
+        "2.10.0": "fix: 修复了托盘图标加载失败的情况，优化了系统图标获取方式。",
+        "2.11.0": "增加自定义快捷键。"
     }
     HELP_TEXT = """
 使用说明:
@@ -105,8 +106,21 @@ class MouseClickSimulator(QMainWindow):
         
         # 初始化设置
         self.settings = QSettings("AdvancedMouseClickSimulator", "Config")
+
+        # 初始化快捷键变量
+        self.start_hotkey = ""
+        self.stop_hotkey = ""
+        self.emergency_hotkey = ""
+
+        # 初始化UI
+        self.init_ui()
+
+        # 从设置加载数据
         self.load_settings()
-        
+
+        # 设置热键
+        self.setup_hotkeys()
+
         # 初始化变量
         self.clicking = False
         self.click_thread = None
@@ -123,10 +137,14 @@ class MouseClickSimulator(QMainWindow):
         self.remote_thread = None
         self.script_engine = None
         self.tray_icon = None
+
+
         
-        # 初始化UI
-        self.init_ui()
-        self.setup_hotkeys()
+        # 从设置加载快捷键
+        #self.load_hotkeys()
+
+
+
 
         # 只在系统托盘可用时初始化
         if QSystemTrayIcon.isSystemTrayAvailable():
@@ -188,7 +206,11 @@ class MouseClickSimulator(QMainWindow):
         # 基本设置标签页
         self.basic_tab = self.create_scrollable_tab(self.init_basic_tab) 
         self.tabs.addTab(self.basic_tab, "基本设置")
-        
+    
+        # 添加快捷键设置标签页
+        self.hotkey_tab = self.create_scrollable_tab(self.init_hotkey_tab)
+        self.tabs.addTab(self.hotkey_tab, "快捷键设置")
+    
         # 高级设置标签页
         self.advanced_tab = self.create_scrollable_tab(self.init_advanced_tab)
         self.tabs.addTab(self.advanced_tab, "高级设置")
@@ -1204,6 +1226,9 @@ class MouseClickSimulator(QMainWindow):
         """)
         
         # 添加日志处理器
+        for handler in logging.getLogger().handlers:
+            if isinstance(handler, QTextEditLogger):
+                logging.getLogger().removeHandler(handler)
         self.log_handler = QTextEditLogger(self.log_view)
         self.log_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         logging.getLogger().addHandler(self.log_handler)
@@ -1595,22 +1620,22 @@ class MouseClickSimulator(QMainWindow):
         self.mouse_position_label.setText(f"鼠标位置: ({x}, {y})")
     
     def setup_hotkeys(self):
+        # 移除旧的热键
         try:
             keyboard.remove_hotkey(self.start_hotkey)
-        except:
-            pass
-        try:
             keyboard.remove_hotkey(self.stop_hotkey)
+            keyboard.remove_hotkey(self.emergency_hotkey)
         except:
             pass
         
-        self.start_hotkey = self.settings.value("hotkeys/start", "-")
-        self.stop_hotkey = self.settings.value("hotkeys/stop", "=")
-        
+        # 设置新的热键
         if self.start_hotkey:
             keyboard.add_hotkey(self.start_hotkey, self.start_clicking)
         if self.stop_hotkey:
             keyboard.add_hotkey(self.stop_hotkey, self.stop_clicking)
+        if self.emergency_hotkey:
+            keyboard.add_hotkey(self.emergency_hotkey, self.emergency_stop_func)
+
     
     def setup_tray_icon(self):
         if not QSystemTrayIcon.isSystemTrayAvailable():
@@ -1771,8 +1796,15 @@ class MouseClickSimulator(QMainWindow):
         self.settings.setValue("remote/password", self.remote_password_edit.text())
         
         # 快捷键设置
+        if hasattr(self, 'start_hotkey_edit'):
+            self.start_hotkey = self.start_hotkey_edit.text()
+            self.stop_hotkey = self.stop_hotkey_edit.text()
+            self.emergency_hotkey = self.emergency_hotkey_edit.text()
+        
         self.settings.setValue("hotkeys/start", self.start_hotkey)
         self.settings.setValue("hotkeys/stop", self.stop_hotkey)
+        self.settings.setValue("hotkeys/emergency", self.emergency_hotkey)
+    
         
         # 系统设置
         self.settings.setValue("system/autostart", False)  # 需要根据实际设置
@@ -1826,9 +1858,24 @@ class MouseClickSimulator(QMainWindow):
         self.remote_port = self.settings.value("remote/port", 12345, type=int)
         self.remote_password = self.settings.value("remote/password", "")
         
-        # 快捷键设置
+        # 快捷键设置 - 只加载值，不更新UI
         self.start_hotkey = self.settings.value("hotkeys/start", "-")
         self.stop_hotkey = self.settings.value("hotkeys/stop", "=")
+        self.emergency_hotkey = self.settings.value("hotkeys/emergency", "esc")
+        #self.settings.setValue("hotkeys/start", self.start_hotkey_edit.text())
+        #self.settings.setValue("hotkeys/stop", self.stop_hotkey_edit.text())
+        #self.settings.setValue("hotkeys/emergency", self.emergency_hotkey_edit.text())
+
+        # 如果有UI控件，更新它们
+        if hasattr(self, 'start_hotkey_edit'):
+            self.start_hotkey_edit.setText(self.start_hotkey)
+            self.stop_hotkey_edit.setText(self.stop_hotkey)
+            self.emergency_hotkey_edit.setText(self.emergency_hotkey)
+        
+        # 设置热键
+        self.setup_hotkeys()
+
+
         
         # 系统设置
         self.autostart = self.settings.value("system/autostart", False, type=bool)
@@ -2212,6 +2259,162 @@ class MouseClickSimulator(QMainWindow):
 
         event.accept()
 
+    def init_hotkey_tab(self, layout=None):
+        if layout is None:
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QScrollArea.NoFrame)
+            
+            tab_content = QWidget()
+            layout = QVBoxLayout(tab_content)
+            layout.setSpacing(10)
+            layout.setContentsMargins(10, 10, 10, 10)
+            
+            self.init_hotkey_tab(layout)
+            
+            scroll.setWidget(tab_content)
+            self.hotkey_tab = scroll
+            return
+        
+        # 快捷键设置组
+        hotkey_group = QGroupBox("快捷键设置")
+        hotkey_layout = QVBoxLayout()
+        hotkey_layout.setSpacing(10)
+    
+        # 使用当前值初始化编辑框，而不是从设置重新加载
+        self.start_hotkey_edit = QLineEdit(self.start_hotkey)
+        self.stop_hotkey_edit = QLineEdit(self.stop_hotkey)
+        self.emergency_hotkey_edit = QLineEdit(self.emergency_hotkey)
+    
+        # 开始模拟快捷键
+        start_row = QHBoxLayout()
+        start_row.addWidget(QLabel("开始模拟:"))
+        self.start_hotkey_edit = QLineEdit(self.settings.value("hotkeys/start", "-"))
+        self.start_hotkey_edit.setPlaceholderText("按下快捷键...")
+        self.start_hotkey_edit.setReadOnly(True)
+        self.start_hotkey_edit.mousePressEvent = lambda _: self.record_hotkey("start")
+        start_row.addWidget(self.start_hotkey_edit)
+        hotkey_layout.addLayout(start_row)
+        
+        # 停止模拟快捷键
+        stop_row = QHBoxLayout()
+        stop_row.addWidget(QLabel("停止模拟:"))
+        self.stop_hotkey_edit = QLineEdit(self.settings.value("hotkeys/stop", "="))
+        self.stop_hotkey_edit.setPlaceholderText("按下快捷键...")
+        self.stop_hotkey_edit.setReadOnly(True)
+        self.stop_hotkey_edit.mousePressEvent = lambda _: self.record_hotkey("stop")
+        stop_row.addWidget(self.stop_hotkey_edit)
+        hotkey_layout.addLayout(stop_row)
+        
+        # 紧急停止快捷键
+        emergency_row = QHBoxLayout()
+        emergency_row.addWidget(QLabel("紧急停止:"))
+        self.emergency_hotkey_edit = QLineEdit(self.settings.value("hotkeys/emergency", "esc"))
+        self.emergency_hotkey_edit.setPlaceholderText("按下快捷键...")
+        self.emergency_hotkey_edit.setReadOnly(True)
+        self.emergency_hotkey_edit.mousePressEvent = lambda _: self.record_hotkey("emergency")
+        emergency_row.addWidget(self.emergency_hotkey_edit)
+        hotkey_layout.addLayout(emergency_row)
+        
+        # 重置按钮
+        reset_btn = QPushButton("重置为默认值")
+        reset_btn.clicked.connect(self.reset_hotkeys)
+        hotkey_layout.addWidget(reset_btn)
+        
+        hotkey_group.setLayout(hotkey_layout)
+        layout.addWidget(hotkey_group)
+        layout.addStretch()
+
+    def record_hotkey(self, hotkey_type):
+        """记录新的快捷键"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"设置{hotkey_type}快捷键")
+        dialog.setFixedSize(300, 100)
+        
+        layout = QVBoxLayout()
+        label = QLabel("按下新的快捷键组合...")
+        layout.addWidget(label)
+        
+        dialog.setLayout(layout)
+        
+        def on_key_press(event):
+            key = event.name
+            if event.event_type == "down":
+                # 忽略单键修饰键
+                if key in ["ctrl", "shift", "alt", "windows"]:
+                    return
+                    
+                # 获取修饰键
+                modifiers = []
+                if keyboard.is_pressed("ctrl"):
+                    modifiers.append("ctrl")
+                if keyboard.is_pressed("shift"):
+                    modifiers.append("shift")
+                if keyboard.is_pressed("alt"):
+                    modifiers.append("alt")
+                if keyboard.is_pressed("windows"):
+                    modifiers.append("windows")
+                    
+                # 组合键
+                if modifiers:
+                    hotkey = "+".join(modifiers + [key])
+                else:
+                    hotkey = key
+                    
+                # 更新UI
+                if hotkey_type == "start":
+                    self.start_hotkey_edit.setText(hotkey)
+                elif hotkey_type == "stop":
+                    self.stop_hotkey_edit.setText(hotkey)
+                elif hotkey_type == "emergency":
+                    self.emergency_hotkey_edit.setText(hotkey)
+                    
+                # 保存设置
+                self.settings.setValue(f"hotkeys/{hotkey_type}", hotkey)
+                self.setup_hotkeys()
+                
+                dialog.close()
+        
+        # 临时监听键盘
+        keyboard.hook(on_key_press)
+        dialog.exec_()
+        keyboard.unhook(on_key_press)
+
+    def reset_hotkeys(self):
+        """重置快捷键为默认值"""
+        default_hotkeys = {
+            "start": "-",
+            "stop": "=",
+            "emergency": "esc"
+        }
+        
+        self.start_hotkey_edit.setText(default_hotkeys["start"])
+        self.stop_hotkey_edit.setText(default_hotkeys["stop"])
+        self.emergency_hotkey_edit.setText(default_hotkeys["emergency"])
+        
+        # 保存设置
+        for key, value in default_hotkeys.items():
+            self.settings.setValue(f"hotkeys/{key}", value)
+        
+        self.setup_hotkeys()
+
+    def load_hotkeys(self):
+        """从设置加载快捷键配置"""
+        # 加载快捷键设置
+        self.start_hotkey = self.settings.value("hotkeys/start", "-")
+        self.stop_hotkey = self.settings.value("hotkeys/stop", "=")
+        self.emergency_hotkey = self.settings.value("hotkeys/emergency", "esc")
+        
+        # 如果有UI控件，更新它们
+        if hasattr(self, 'start_hotkey_edit'):
+            self.start_hotkey_edit.setText(self.start_hotkey)
+            self.stop_hotkey_edit.setText(self.stop_hotkey)
+            self.emergency_hotkey_edit.setText(self.emergency_hotkey)
+        
+        # 设置热键
+        self.setup_hotkeys()
+
+
 
 class QTextEditLogger(logging.Handler):
     def __init__(self, widget):
@@ -2221,10 +2424,13 @@ class QTextEditLogger(logging.Handler):
         
     def emit(self, record):
         msg = self.format(record)
-        self.widget.append(msg)
+        # 使用线程安全的QMetaObject.invokeMethod来更新UI
+        QMetaObject.invokeMethod(self.widget, 'append', Qt.QueuedConnection, Q_ARG(str, msg))
         # 自动滚动到底部
-        scrollbar = self.widget.verticalScrollBar()
-        scrollbar.setValue(scrollbar.maximum())
+        QMetaObject.invokeMethod(self.widget.verticalScrollBar(), 'setValue', 
+                               Qt.QueuedConnection, 
+                               Q_ARG(int, self.widget.verticalScrollBar().maximum()))
+
 
 
 if __name__ == "__main__":
