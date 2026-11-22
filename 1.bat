@@ -1,2 +1,2 @@
 cls
-python MouseClick.py
+python Mouse_Click_Simulator.py
